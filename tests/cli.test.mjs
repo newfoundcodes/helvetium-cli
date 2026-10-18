@@ -29,7 +29,7 @@ import {
   runCLI,
   stringOption,
 } from '../dist/index.js';
-import { createProject } from '@newfoundcodes/helvetium-boilerplate';
+import { createProject, manifest } from '@newfoundcodes/helvetium-boilerplate';
 
 const roots = [];
 async function tmp(prefix = 'helvet-cli-') {
@@ -359,7 +359,10 @@ test('cli 04 create generates project without install', async () => {
 
   const pkg = JSON.parse(await readFile(join(target, 'package.json'), 'utf8'));
 
-  assert.equal(pkg.dependencies['@newfoundcodes/helvetium-apiary'], '^0.1.0');
+  assert.equal(
+    pkg.dependencies['@newfoundcodes/helvetium-apiary'],
+    `^${manifest.framework.apiary}`,
+  );
   assert.equal(pkg.dependencies['@newfoundcodes/helvetium-catapult'], undefined);
   assert.equal(pkg.dependencies['@newfoundcodes/helvetium-flakturm'], undefined);
 
