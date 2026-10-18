@@ -1,6 +1,6 @@
 {
   "name": "@newfoundcodes/helvetium-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Helvetium command-line interface for project creation, code generation, migrations, development, inspection, and framework tooling.",
   "type": "module",
   "license": "AGPL-3.0-only",
