@@ -1,0 +1,74 @@
+{
+  "name": "@newfoundcodes/helvetium-cli",
+  "version": "0.1.0",
+  "description": "Helvetium command-line interface for project creation, code generation, migrations, development, inspection, and framework tooling.",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "import": "./dist/registry.js"
+    },
+    "./generators": {
+      "types": "./dist/generators/index.d.ts",
+      "import": "./dist/generators/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "helvet": "./bin/helvet.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist coverage site",
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "coverage": "npm run build && node --experimental-test-coverage --test tests/*.test.mjs",
+    "prepublishOnly": "npm run typecheck && npm test",
+    "format": "prettier --write .",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.7.2",
+    "@newfoundcodes/helvetium-boilerplate": ">=0.1.0",
+    "@newfoundcodes/helvetium-boot": ">=0.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/estree": "^1.0.9",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.10.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.69.0"
+  },
+  "keywords": [
+    "helvetium",
+    "cli",
+    "artisan",
+    "generator",
+    "migration",
+    "scaffold",
+    "typescript"
+  ],
+  "bundleDependencies": [
+    "@newfoundcodes/helvetium-boilerplate"
+  ]
+}
