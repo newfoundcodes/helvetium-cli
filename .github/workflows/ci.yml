@@ -16,12 +16,36 @@ jobs:
         node: [22, 24]
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: helvetium-cli
+      - uses: actions/checkout@v4
+        with:
+          repository: newfoundcodes/helvetium-boilerplate
+          path: helvetium-boilerplate
+      - uses: actions/checkout@v4
+        with:
+          repository: newfoundcodes/helvetium-boot
+          path: helvetium-boot
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
       - run: npm install --ignore-scripts
-      - run: npm exec prettier -- --check .
-      - run: npm run lint
-      - run: npm run typecheck
+        working-directory: helvetium-boot
       - run: npm run build
+        working-directory: helvetium-boot
+      - run: npm install --ignore-scripts
+        working-directory: helvetium-boilerplate
+      - run: npm run build
+        working-directory: helvetium-boilerplate
+      - run: npm install --ignore-scripts --no-save ../helvetium-boilerplate ../helvetium-boot
+        working-directory: helvetium-cli
+      - run: npm exec prettier -- --check .
+        working-directory: helvetium-cli
+      - run: npm run lint
+        working-directory: helvetium-cli
+      - run: npm run typecheck
+        working-directory: helvetium-cli
+      - run: npm run build
+        working-directory: helvetium-cli
       - run: npm test
+        working-directory: helvetium-cli
