@@ -28,6 +28,7 @@ import {
   snake,
   runCLI,
   stringOption,
+  platformExecutable,
 } from '../dist/index.js';
 import { createProject, manifest } from '@newfoundcodes/helvetium-boilerplate';
 
@@ -153,11 +154,22 @@ test('project 05 pnpm lock selects pnpm', async () => {
   assert.equal(await detectPackageManager(root), 'pnpm');
 });
 
+test('process 01 uses native executables on each platform', () => {
+  assert.equal(platformExecutable('npm', 'linux'), 'npm');
+  assert.equal(platformExecutable('npm', 'darwin'), 'npm');
+  assert.equal(platformExecutable('npm', 'win32'), 'npm.cmd');
+  assert.equal(platformExecutable('pnpm', 'win32'), 'pnpm.cmd');
+  assert.equal(platformExecutable('yarn', 'win32'), 'yarn.cmd');
+  assert.equal(platformExecutable('bun', 'win32'), 'bun.exe');
+});
+
 test('generator 01 creates page', async () => {
   const root = await project();
   const r = await generatePage({ name: 'Contact', projectRoot: root });
 
-  assert.match(await readFile(r.file, 'utf8'), /ContactPage/);
+  const source = await readFile(r.file, 'utf8');
+  assert.match(source, /ContactPage/);
+  assert.doesNotMatch(source, /import .*\b(?:h|Fragment)\b/);
 });
 
 test('generator 02 registers page route', async () => {
@@ -178,7 +190,9 @@ test('generator 04 creates component', async () => {
   const root = await project();
   const r = await generateComponent({ name: 'Alert', projectRoot: root });
 
-  assert.match(await readFile(r.file, 'utf8'), /AlertComponent/);
+  const source = await readFile(r.file, 'utf8');
+  assert.match(source, /AlertComponent/);
+  assert.doesNotMatch(source, /import .*\b(?:h|Fragment)\b/);
 });
 
 test('generator 05 creates handler', async () => {
@@ -347,7 +361,7 @@ test('cli 04 create generates project without install', async () => {
     target = join(parent, 'app'),
     m = memoryIO();
   const code = await runCLI({
-    argv: ['create', target, '--no-install', '--alps', '--mcp'],
+    argv: ['create', target, '--no-install', '--alps', '--mcp', '--no-git'],
     cwd: parent,
     io: m.io,
     color: false,
@@ -368,6 +382,89 @@ test('cli 04 create generates project without install', async () => {
 
   assert.match(await readFile(join(target, 'background/index.ts'), 'utf8'), /createApiary/);
   assert.equal(await readFile(join(target, 'src/cdn.ts')).catch(() => null), null);
+});
+
+test('cli 04a create can opt into Playwright browser tests', async () => {
+  const parent = await tmp(),
+    target = join(parent, 'playwright-app'),
+    m = memoryIO();
+  const code = await runCLI({
+    argv: [
+      'create',
+      target,
+      '--no-install',
+      '--no-alps',
+      '--no-apiary',
+      '--no-mcp',
+      '--playwright',
+      '--no-git',
+    ],
+    cwd: parent,
+    io: m.io,
+    color: false,
+    loadProjectExtensions: false,
+  });
+
+  assert.equal(code, 0);
+  const pkg = JSON.parse(await readFile(join(target, 'package.json'), 'utf8'));
+  assert.equal(pkg.devDependencies['@playwright/test'], '^1.55.0');
+  assert.equal(pkg.scripts['test:e2e'], 'npm run build && playwright test');
+  assert.ok(await readFile(join(target, 'playwright.config.ts'), 'utf8'));
+  assert.ok(await readFile(join(target, 'e2e/home.spec.ts'), 'utf8'));
+});
+
+test('cli 04b create can opt into Prettier and ESLint style checks', async () => {
+  const parent = await tmp(),
+    target = join(parent, 'quality-app'),
+    m = memoryIO();
+  const code = await runCLI({
+    argv: ['create', target, '--no-install', '--prettier', '--eslint', '--no-git'],
+    cwd: parent,
+    io: m.io,
+    color: false,
+    loadProjectExtensions: false,
+  });
+
+  assert.equal(code, 0);
+  const pkg = JSON.parse(await readFile(join(target, 'package.json'), 'utf8'));
+  assert.equal(pkg.devDependencies.prettier, '^3.9.6');
+  assert.equal(pkg.devDependencies['@stylistic/eslint-plugin'], '^5.10.0');
+  assert.ok(await readFile(join(target, 'prettier.config.mjs'), 'utf8'));
+  assert.ok(await readFile(join(target, 'eslint.config.mjs'), 'utf8'));
+});
+
+test('cli 04c create can initialize Git when requested', async () => {
+  const parent = await tmp(),
+    target = join(parent, 'git-app'),
+    m = memoryIO();
+  const code = await runCLI({
+    argv: ['create', target, '--no-install', '--no-alps', '--no-apiary', '--no-mcp', '--git'],
+    cwd: parent,
+    io: m.io,
+    color: false,
+    loadProjectExtensions: false,
+  });
+
+  assert.equal(code, 0);
+  assert.match(await readFile(join(target, '.git', 'HEAD'), 'utf8'), /^ref:/);
+  assert.ok(m.out.some((line) => line.includes('Initialized repository')));
+});
+
+test('cli 04d create can skip Git initialization', async () => {
+  const parent = await tmp(),
+    target = join(parent, 'no-git-app'),
+    m = memoryIO();
+  const code = await runCLI({
+    argv: ['create', target, '--no-install', '--no-alps', '--no-apiary', '--no-mcp', '--no-git'],
+    cwd: parent,
+    io: m.io,
+    color: false,
+    loadProjectExtensions: false,
+  });
+
+  assert.equal(code, 0);
+  await assert.rejects(() => readFile(join(target, '.git', 'HEAD')));
+  assert.ok(m.out.every((line) => !line.includes('Initialized repository')));
 });
 
 test('cli 05 new page works from nested directory', async () => {
@@ -486,6 +583,22 @@ test('cli 12 completion outputs bash commands', async () => {
   assert.match(m.out[0], /new:page/);
 });
 
+test('cli 13 completion outputs PowerShell commands', async () => {
+  const m = memoryIO();
+  assert.equal(
+    await runCLI({
+      argv: ['completion', 'powershell'],
+      cwd: await tmp(),
+      io: m.io,
+      color: false,
+      loadProjectExtensions: false,
+    }),
+    0,
+  );
+  assert.match(m.out[0], /Register-ArgumentCompleter/);
+  assert.match(m.out[0], /new:page/);
+});
+
 test('generator 18 preserves command namespaces', async () => {
   const root = await project();
   const r = await generateCommand({ name: 'reports:daily', projectRoot: root });
@@ -502,4 +615,16 @@ test('generator 19 creates an Apiary worker', async () => {
   await runCLI({ argv: ['new:worker', 'sync'], cwd: d, io: m.io, color: false });
   assert.match(await readFile(w, 'utf8'), /syncWorker/);
   assert.match(await readFile(w, 'utf8'), /helvetium-apiary/);
+  assert.match(
+    await readFile(join(d, 'background/index.ts'), 'utf8'),
+    /workerDefinitions = \[syncWorker,/,
+  );
+});
+
+test('cli 14 exposes Apiary worker controls', async () => {
+  const registry = await createRegistry();
+  const command = registry.get('worker');
+
+  assert.ok(command);
+  assert.equal(registry.get('workers'), command);
 });
