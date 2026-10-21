@@ -179,11 +179,11 @@ export function builtInCommands(registry: CommandRegistry): CommandDefinition[] 
         ctx.io.write(
           ctx.json
             ? JSON.stringify(
-                { cli: '0.1.0', node: process.version, project: project?.name ?? null },
+                { cli: '0.1.3', node: process.version, project: project?.name ?? null },
                 null,
                 2,
               )
-            : `Helvetium CLI 0.1.0\nNode ${process.version}${project ? `\nProject ${project.name}` : ''}`,
+            : `Helvetium CLI 0.1.3\nNode ${process.version}${project ? `\nProject ${project.name}` : ''}`,
         );
       },
     },
