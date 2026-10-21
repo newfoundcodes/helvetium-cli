@@ -375,7 +375,7 @@ test('cli 04 create generates project without install', async () => {
 
   assert.equal(
     pkg.dependencies['@newfoundcodes/helvetium-apiary'],
-    `^${manifest.framework.apiary}`,
+    `>=${manifest.framework.apiary}`,
   );
   assert.equal(pkg.dependencies['@newfoundcodes/helvetium-catapult'], undefined);
   assert.equal(pkg.dependencies['@newfoundcodes/helvetium-flakturm'], undefined);
@@ -565,7 +565,7 @@ test('cli 11 global version flag works', async () => {
     }),
     0,
   );
-  assert.equal(m.out[0], '0.1.0');
+  assert.equal(m.out[0], '0.1.3');
 });
 
 test('cli 12 completion outputs bash commands', async () => {
