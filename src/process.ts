@@ -25,6 +25,17 @@
 import { spawn } from 'node:child_process';
 import type { PackageManager } from '@newfoundcodes/helvetium-boilerplate';
 
+const windowsExecutables: Record<string, string> = {
+  npm: 'npm.cmd',
+  pnpm: 'pnpm.cmd',
+  yarn: 'yarn.cmd',
+  bun: 'bun.exe',
+};
+
+export function platformExecutable(command: string, platform = process.platform): string {
+  return platform === 'win32' ? (windowsExecutables[command] ?? command) : command;
+}
+
 export async function runProcess(
   command: string,
   args: string[],
@@ -32,10 +43,9 @@ export async function runProcess(
   env: Record<string, string | undefined> = {},
 ): Promise<number> {
   return await new Promise<number>((resolve, reject) => {
-    const child = spawn(command, args, {
+    const child = spawn(platformExecutable(command), args, {
       cwd,
       stdio: 'inherit',
-      shell: process.platform === 'win32',
       env: { ...process.env, ...env },
     });
 
