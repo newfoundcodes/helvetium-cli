@@ -23,13 +23,14 @@
  */
 
 import { join } from 'node:path';
-import { writeGenerated } from '../files.js';
-import { camel } from '../names.js';
+import { editText, insertBefore, writeGenerated } from '../files.js';
+import { camel, kebab } from '../names.js';
 import type { WorkerGeneratorOptions } from '../interfaces/generators/worker.js';
 
 export async function generateWorker(o: WorkerGeneratorOptions) {
   const camelName = camel(o.name);
-  const file = join(o.projectRoot, 'background/workers', `${o.name}.ts`);
+  const fileName = kebab(o.name);
+  const file = join(o.projectRoot, 'background/workers', `${fileName}.ts`);
 
   await writeGenerated(
     file,
@@ -42,6 +43,23 @@ export const ${camelName}Worker = defineJob('${o.name}', async (job) => {
     o.force ?? false,
     o.dryRun ?? false,
   );
+
+  const registry = join(o.projectRoot, 'background/index.ts');
+  if (!o.dryRun) {
+    await editText(registry, (source) => {
+      const importLine = `import { ${camelName}Worker } from './workers/${fileName}.js';\n`;
+      let next = source.includes(importLine)
+        ? source
+        : insertBefore(source, 'export const workerDefinitions', importLine);
+      const anchor = 'export const workerDefinitions = [';
+      if (!next.includes(`${camelName}Worker,`)) {
+        next = next.replace(anchor, `${anchor}${camelName}Worker, `);
+      }
+
+      return next;
+    });
+  }
+
   return { file, name: o.name };
 }
 
