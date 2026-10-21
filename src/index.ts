@@ -29,6 +29,7 @@ export { findProjectRoot, requireProjectRoot, detectPackageManager } from './pro
 export { inspectRoutes, type RouteInfo } from './routes.js';
 export { checkEnvironment } from './env.js';
 export { runMigration, type MigrationAction } from './migrations.js';
+export { platformExecutable } from './process.js';
 export { words, pascal, camel, kebab, snake, ensureSuffix, safeSegment } from './names.js';
 export type {
   CommandContext,
