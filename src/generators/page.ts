@@ -36,7 +36,7 @@ export async function generatePage(
   const routePath =
     options.path ?? (className === 'HomePage' ? '/' : `/${kebab(className.replace(/Page$/, ''))}`);
 
-  const content = `import { Anchor, Fragment, h } from '@newfoundcodes/helvetium-dom';
+  const content = `import { Anchor } from '@newfoundcodes/helvetium-dom';
 
 export function ${className}() {
   return (
