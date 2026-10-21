@@ -21,6 +21,12 @@ helvet --version
 helvet list
 ```
 
+The CLI uses Node's native process APIs, so project scripts and package-manager commands work on Linux, macOS, Windows Command Prompt, and PowerShell. On PowerShell, enable completion with:
+
+```powershell
+helvet completion powershell | Invoke-Expression
+```
+
 ## Create a project
 
 ```bash
@@ -31,6 +37,8 @@ helvet dev
 ```
 
 Project generation is delegated to `@newfoundcodes/helvetium-boilerplate`. The CLI bundles the compatible Boilerplate release in its npm publication artifact so `helvet create` has a deterministic template implementation.
+
+When run interactively, `helvet create` asks whether to initialize a Git repository after generating the project. Use `--git` to initialize it without prompting or `--no-git` to skip initialization.
 
 Generate without installing project dependencies:
 
@@ -45,7 +53,25 @@ helvet create my-app \
   --name "My Application" \
   --package @acme/my-app \
   --port 4000 \
-  --pm npm
+  --pm npm \
+  --git
+```
+
+Playwright browser tests, Prettier formatting, and ESLint linting are optional. Select them in the
+interactive module prompt, or enable them directly:
+
+```bash
+helvet create my-app --playwright
+cd my-app
+npx playwright install chromium
+npm run test:e2e
+```
+
+```bash
+helvet create my-app --prettier --eslint
+cd my-app
+npm run format:check
+npm run lint
 ```
 
 ## Generators
@@ -152,6 +178,22 @@ helvet rollback
 
 The CLI runs the generated project's migration scripts. Database configuration and durable migration-state storage remain application-owned.
 
+## Background workers
+
+Generated Apiary projects expose worker controls through the CLI:
+
+```bash
+helvet worker list
+helvet worker jobs
+helvet worker trigger example '{"id":"manual"}'
+helvet worker run example '{"id":"offline"}'
+helvet worker work
+helvet worker cancel JOB_ID
+helvet worker retry JOB_ID
+```
+
+`trigger` uses the running project's `/internal/apiary` endpoint when reachable and otherwise queues the job in the local file-backed store. `run` executes one job offline; `work` starts a local worker process. Use `--queue NAME` for a named queue and `HELVETIUM_APIARY_URL` for a non-default running-server URL.
+
 ## Route inspection
 
 ```bash
@@ -189,7 +231,7 @@ helvet project:info
 ```bash
 helvet dev
 helvet build
-helvet serve
+helvet serve # builds first, then starts the production server
 helvet test
 helvet typecheck
 helvet check
@@ -200,6 +242,8 @@ These commands delegate to the current project's package-manager scripts. Argume
 ```bash
 helvet test -- --watch
 ```
+
+Generated projects discover test files recursively, including both `.test.ts` and `.test.tsx` files.
 
 ## Command discovery
 
