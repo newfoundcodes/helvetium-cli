@@ -32,7 +32,7 @@ export async function generateComponent(o: ComponentGeneratorOptions) {
   const file = join(o.projectRoot, 'src/app/components', `${name}.tsx`);
   await writeGenerated(
     file,
-    `import { Fragment, h, type VNodeChild } from '@newfoundcodes/helvetium-dom';
+    `import type { VNodeChild } from '@newfoundcodes/helvetium-dom';
 
 export interface ${name}Props {
   children?: VNodeChild;
