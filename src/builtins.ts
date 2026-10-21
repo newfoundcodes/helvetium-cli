@@ -24,7 +24,7 @@
 
 import { createProject } from '@newfoundcodes/helvetium-boilerplate';
 import type { PackageManager } from '@newfoundcodes/helvetium-boilerplate';
-import { checkbox } from '@inquirer/prompts';
+import { checkbox, confirm } from '@inquirer/prompts';
 import { join } from 'node:path';
 import { booleanOption, numberOption, stringOption } from './argv.js';
 import { checkEnvironment } from './env.js';
@@ -65,11 +65,71 @@ function generated(
   ctx.io.write(`${paint('CREATE', 'green', ctx.color)} ${label} ${file}`);
 }
 
-async function scriptCommand(ctx: { cwd: string; passthrough: string[] }, script: string) {
+async function scriptCommand(
+  ctx: { cwd: string; passthrough: string[] },
+  script: string,
+  extra: string[] = [],
+) {
   const root = await requireProjectRoot(ctx.cwd);
   const manager = await detectPackageManager(root);
-  const c = scriptInvocation(manager, script, ctx.passthrough);
+  const pkg = await readPackage(root);
+  const scripts = pkg.scripts as Record<string, unknown> | undefined;
+  if (typeof scripts?.[script] !== 'string') {
+    throw new Error(`The project does not define an npm script named "${script}".`);
+  }
+
+  const c = scriptInvocation(manager, script, [...extra, ...ctx.passthrough]);
   return runProcess(c.command, c.args, root);
+}
+
+async function buildProject(ctx: { cwd: string; passthrough: string[] }): Promise<number> {
+  const root = await requireProjectRoot(ctx.cwd);
+  const pkg = await readPackage(root);
+  const scripts = pkg.scripts as Record<string, unknown> | undefined;
+
+  if (typeof scripts?.['build:server'] !== 'string') {
+    return scriptCommand(ctx, 'build');
+  }
+
+  if (typeof scripts.clean === 'string') {
+    const cleanCode = await scriptCommand({ cwd: ctx.cwd, passthrough: [] }, 'clean');
+    if (cleanCode !== 0) {
+      return cleanCode;
+    }
+  }
+
+  const serverCode = await scriptCommand({ cwd: ctx.cwd, passthrough: [] }, 'build:server');
+  if (serverCode !== 0) {
+    return serverCode;
+  }
+
+  if (typeof scripts['build:web'] !== 'string') {
+    return 0;
+  }
+
+  return scriptCommand(ctx, 'build:web');
+}
+
+async function buildAndServe(ctx: { cwd: string; passthrough: string[] }): Promise<number> {
+  const buildCode = await buildProject({ cwd: ctx.cwd, passthrough: [] });
+  if (buildCode !== 0) {
+    return buildCode;
+  }
+
+  return scriptCommand(ctx, 'start');
+}
+
+async function initializeGitRepository(directory: string): Promise<boolean> {
+  if (await pathExists(join(directory, '.git'))) {
+    return false;
+  }
+
+  const code = await runProcess('git', ['init'], directory);
+  if (code !== 0) {
+    throw new Error(`git init exited with code ${code}`);
+  }
+
+  return true;
 }
 
 export function builtInCommands(registry: CommandRegistry): CommandDefinition[] {
@@ -132,7 +192,7 @@ export function builtInCommands(registry: CommandRegistry): CommandDefinition[] 
       group: 'Project',
       description: 'Create a production-ready full-stack Helvetium project.',
       usage:
-        'helvet create <directory> [--name NAME] [--package NAME] [--port 3000] [--no-install] [--force]',
+        'helvet create <directory> [--name NAME] [--package NAME] [--port 3000] [--playwright] [--prettier] [--eslint] [--git|--no-git] [--no-install] [--force]',
       run: async (ctx) => {
         const target = ctx.args[0];
         if (!target) {
@@ -140,14 +200,20 @@ export function builtInCommands(registry: CommandRegistry): CommandDefinition[] 
         }
 
         const install = ctx.options.install !== false;
+        const gitFlagProvided = ctx.options.git !== undefined;
         const projectName = stringOption(ctx.options, 'name'),
           packageName = stringOption(ctx.options, 'package'),
           port = numberOption(ctx.options, 'port');
-        const anyFlagProvided = ['alps', 'apiary', 'mcp'].some(
+        const anyFlagProvided = ['alps', 'apiary', 'mcp', 'playwright', 'prettier', 'eslint'].some(
           (flag) => ctx.options[flag] !== undefined,
         );
 
-        let useAlps: boolean, useApiary: boolean, useMcp: boolean;
+        let useAlps: boolean,
+          useApiary: boolean,
+          useMcp: boolean,
+          usePlaywright: boolean,
+          usePrettier: boolean,
+          useEslint: boolean;
         if (!anyFlagProvided) {
           const answers = await checkbox({
             message: 'Select the Helvetium modules you want to include:',
@@ -155,16 +221,25 @@ export function builtInCommands(registry: CommandRegistry): CommandDefinition[] 
               { name: 'Alps (Database, ORM)', value: 'alps', checked: true },
               { name: 'Apiary (Background Jobs)', value: 'apiary', checked: true },
               { name: 'MCP (Model Context Protocol)', value: 'mcp', checked: true },
+              { name: 'Playwright (Browser E2E)', value: 'playwright', checked: false },
+              { name: 'Prettier (Formatting)', value: 'prettier', checked: false },
+              { name: 'ESLint (Linting + Style)', value: 'eslint', checked: false },
             ],
           });
 
           useAlps = answers.includes('alps');
           useApiary = answers.includes('apiary');
           useMcp = answers.includes('mcp');
+          usePlaywright = answers.includes('playwright');
+          usePrettier = answers.includes('prettier');
+          useEslint = answers.includes('eslint');
         } else {
           useAlps = booleanOption(ctx.options, 'alps', undefined, true);
           useApiary = booleanOption(ctx.options, 'apiary', undefined, true);
           useMcp = booleanOption(ctx.options, 'mcp', undefined, true);
+          usePlaywright = booleanOption(ctx.options, 'playwright', undefined, false);
+          usePrettier = booleanOption(ctx.options, 'prettier', undefined, false);
+          useEslint = booleanOption(ctx.options, 'eslint', undefined, false);
         }
 
         const result = await createProject({
@@ -178,7 +253,23 @@ export function builtInCommands(registry: CommandRegistry): CommandDefinition[] 
           ...(useAlps !== undefined ? { useAlps } : {}),
           ...(useApiary !== undefined ? { useApiary } : {}),
           ...(useMcp !== undefined ? { useMcp } : {}),
+          ...(usePlaywright !== undefined ? { usePlaywright } : {}),
+          ...(usePrettier !== undefined ? { usePrettier } : {}),
+          ...(useEslint !== undefined ? { useEslint } : {}),
         });
+
+        const initializeGit = gitFlagProvided
+          ? booleanOption(ctx.options, 'git')
+          : await confirm({
+              message: 'Would you like to initialize a Git repository for this project?',
+              default: true,
+            });
+        if (initializeGit) {
+          const initialized = await initializeGitRepository(result.targetDirectory);
+          ctx.io.write(
+            `${paint('GIT', 'green', ctx.color)} ${initialized ? 'Initialized repository' : 'Repository already exists'}`,
+          );
+        }
 
         ctx.io.write(`${paint('CREATED', 'green', ctx.color)} ${result.targetDirectory}`);
         return 0;
@@ -511,6 +602,40 @@ export function builtInCommands(registry: CommandRegistry): CommandDefinition[] 
       },
     },
     {
+      name: 'worker',
+      aliases: ['workers'],
+      group: 'Background',
+      description: 'Inspect, trigger, run, or control Helvetium Apiary workers.',
+      usage:
+        'helvet worker <list|jobs|trigger|run|work|cancel|retry> [name] [payload] [--queue name]',
+      run: async (ctx) => {
+        const action = ctx.args[0] ?? 'list';
+        const allowed = new Set(['list', 'jobs', 'trigger', 'run', 'work', 'cancel', 'retry']);
+        if (!allowed.has(action)) {
+          throw new Error(`Unknown worker action: ${action}`);
+        }
+
+        const root = await requireProjectRoot(ctx.cwd);
+        const manager = await detectPackageManager(root);
+        const queue = stringOption(ctx.options, 'queue');
+        const args = [
+          ...ctx.args,
+          ...(queue ? [`--queue=${queue}`] : []),
+          ...(ctx.json ? ['--json'] : []),
+        ];
+        const c = scriptInvocation(manager, 'workers', [...args, ...ctx.passthrough]);
+        const pkg = await readPackage(root);
+        const scripts = pkg.scripts as Record<string, unknown> | undefined;
+        if (typeof scripts?.workers !== 'string') {
+          throw new Error(
+            'This project does not include Apiary worker controls. Regenerate it with Apiary enabled or add the workers script.',
+          );
+        }
+
+        return runProcess(c.command, c.args, root);
+      },
+    },
+    {
       name: 'migrate',
       group: 'Database',
       description: 'Run Alps migrations. Actions: up, down, status.',
@@ -695,8 +820,8 @@ MCP: ${info.helvetium.mcp}`,
     {
       name: 'completion',
       group: 'General',
-      description: 'Generate shell completion for bash, zsh, or fish.',
-      usage: 'helvet completion <bash|zsh|fish>',
+      description: 'Generate shell completion for bash, zsh, fish, or PowerShell.',
+      usage: 'helvet completion <bash|zsh|fish|powershell>',
       run(ctx) {
         const shell = ctx.args[0] ?? 'bash';
         const names = registry
@@ -724,6 +849,22 @@ MCP: ${info.helvetium.mcp}`,
           return;
         }
 
+        if (shell === 'powershell' || shell === 'pwsh') {
+          const commands = names
+            .split(' ')
+            .map((name) => `'${name}'`)
+            .join(', ');
+          ctx.io.write(`Register-ArgumentCompleter -Native -CommandName helvet -ScriptBlock {
+  param($wordToComplete)
+  @(${commands}) |
+    Where-Object { $_ -like "$wordToComplete*" } |
+    ForEach-Object {
+      [System.Management.Automation.CompletionResult]::new($_, $_, 'Command', $_)
+    }
+}`);
+          return;
+        }
+
         throw new Error(`Unsupported shell: ${shell}`);
       },
     },
@@ -737,14 +878,14 @@ MCP: ${info.helvetium.mcp}`,
       name: 'serve',
       aliases: ['start'],
       group: 'Lifecycle',
-      description: 'Start the compiled production server.',
-      run: async (ctx) => scriptCommand(ctx, 'start'),
+      description: 'Build and start the production server.',
+      run: async (ctx) => buildAndServe(ctx),
     },
     {
       name: 'build',
       group: 'Lifecycle',
       description: 'Build the server and browser bundles.',
-      run: async (ctx) => scriptCommand(ctx, 'build'),
+      run: async (ctx) => buildProject(ctx),
     },
     {
       name: 'test',
