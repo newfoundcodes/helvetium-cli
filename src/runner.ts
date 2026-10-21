@@ -56,7 +56,7 @@ export async function runCLI(options: RunCLIOptions = {}): Promise<number> {
   const json = booleanOption(parsed.options, 'json');
 
   if (parsed.options.version === true || parsed.options.V === true) {
-    io.write('0.1.0');
+    io.write('0.1.3');
     return 0;
   }
 
@@ -71,7 +71,7 @@ export async function runCLI(options: RunCLIOptions = {}): Promise<number> {
   }
 
   if (commandName === '--version' || commandName === '-V') {
-    io.write('0.1.0');
+    io.write('0.1.3');
     return 0;
   }
 
